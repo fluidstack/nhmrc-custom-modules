@@ -1,0 +1,7 @@
+nhmrc_archive_redirect.settings:
+  path: '/admin/config/content/archive-redirects'
+  defaults:
+    _form: '\Drupal\nhmrc_archive_redirect\Form\ArchiveRedirectSettingsForm'
+    _title: 'Archive redirects'
+  requirements:
+    _permission: 'administer site configuration'

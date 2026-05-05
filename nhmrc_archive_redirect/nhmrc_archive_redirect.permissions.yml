@@ -1,0 +1,4 @@
+preview unpublished content:
+  title: 'Preview unpublished content'
+  description: 'Bypasses the archive redirect for unpublished nodes, allowing the user to reach the node URL without being sent to the configured redirect destination. This permission does not independently grant access to view unpublished content — users must also have an appropriate Drupal node-access permission (e.g. "Bypass content access control" or a role with unpublished-view access).'
+  restrict access: true

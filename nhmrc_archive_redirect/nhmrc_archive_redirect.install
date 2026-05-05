@@ -1,0 +1,79 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall functions for the NHMRC archive redirect module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function nhmrc_archive_redirect_schema(): array {
+  $schema['nhmrc_archive_redirect_records'] = [
+    'description' => 'Stores redirect records created when nodes are deleted.',
+    'fields' => [
+      'id' => [
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => 'Primary key.',
+      ],
+      'source' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => 'Source path (no leading slash) of the deleted page.',
+      ],
+      'destination' => [
+        'type' => 'varchar',
+        'length' => 2048,
+        'not null' => TRUE,
+        'description' => 'Redirect destination (internal path or <front>).',
+      ],
+      'status_code' => [
+        'type' => 'int',
+        'size' => 'small',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 302,
+        'description' => 'HTTP redirect status code.',
+      ],
+      'created' => [
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Unix timestamp when the record was created.',
+      ],
+    ],
+    'primary key' => ['id'],
+    'unique keys' => [
+      'source' => ['source'],
+    ],
+    'indexes' => [
+      'source_lookup' => ['source'],
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function nhmrc_archive_redirect_uninstall(): void {
+  $db_schema = \Drupal::database()->schema();
+  if ($db_schema->tableExists('nhmrc_archive_redirect_records')) {
+    $db_schema->dropTable('nhmrc_archive_redirect_records');
+  }
+}
+
+/**
+ * Add nhmrc_archive_redirect_records table for existing installations.
+ */
+function nhmrc_archive_redirect_update_9001(): void {
+  $schema = nhmrc_archive_redirect_schema();
+  $db_schema = \Drupal::database()->schema();
+  if (!$db_schema->tableExists('nhmrc_archive_redirect_records')) {
+    $db_schema->createTable('nhmrc_archive_redirect_records', $schema['nhmrc_archive_redirect_records']);
+  }
+}

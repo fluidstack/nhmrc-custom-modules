@@ -1,0 +1,127 @@
+<?php
+
+/**
+ * @file
+ * Hook implementations for the NHMRC archive redirect module.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Url;
+use Drupal\node\NodeInterface;
+
+/**
+ * Store the node alias before deletion so it is available in hook_entity_delete.
+ */
+function nhmrc_archive_redirect_entity_predelete(EntityInterface $entity): void {
+  if (!$entity instanceof NodeInterface) {
+    return;
+  }
+
+  // Only bother if delete path rules are configured.
+  $rules = \Drupal::config('nhmrc_archive_redirect.settings')->get('delete_path_rules') ?? [];
+  if (empty($rules)) {
+    return;
+  }
+
+  $alias = \Drupal::service('path_alias.manager')
+    ->getAliasByPath('/node/' . $entity->id());
+
+  $store = &drupal_static(__FUNCTION__, []);
+  $store[$entity->uuid()] = $alias;
+}
+
+/**
+ * On node delete, match alias against path-prefix rules and store a redirect.
+ */
+function nhmrc_archive_redirect_entity_delete(EntityInterface $entity): void {
+  if (!$entity instanceof NodeInterface) {
+    return;
+  }
+
+  $config = \Drupal::config('nhmrc_archive_redirect.settings');
+  $rules = $config->get('delete_path_rules') ?? [];
+  if (empty($rules)) {
+    return;
+  }
+
+  $store = &drupal_static('nhmrc_archive_redirect_entity_predelete', []);
+  $alias = $store[$entity->uuid()] ?? NULL;
+
+  // Skip if there is no meaningful alias (raw node path).
+  if (!$alias || $alias === '/node/' . $entity->id()) {
+    return;
+  }
+
+  // Find the best matching rule (longest prefix wins).
+  $destination = _nhmrc_archive_redirect_match_rule($alias, $rules);
+  if ($destination === NULL) {
+    return;
+  }
+
+  // Resolve <front> to the real front-page path.
+  if ($destination === '<front>') {
+    $destination = Url::fromRoute('<front>')->toString();
+  }
+
+  $source = ltrim($alias, '/');
+  $database = \Drupal::database();
+
+  // Avoid duplicates.
+  $exists = $database->select('nhmrc_archive_redirect_records', 'r')
+    ->fields('r', ['id'])
+    ->condition('source', $source)
+    ->execute()
+    ->fetchField();
+
+  if ($exists) {
+    return;
+  }
+
+  $status = (int) ($config->get('status_code') ?? 302);
+
+  $database->insert('nhmrc_archive_redirect_records')
+    ->fields([
+      'source'      => $source,
+      'destination' => $destination,
+      'status_code' => $status,
+      'created'     => \Drupal::time()->getRequestTime(),
+    ])
+    ->execute();
+
+  if ($config->get('log_redirects')) {
+    \Drupal::logger('nhmrc_archive_redirect')->notice(
+      'Stored delete redirect: @alias → @dest (@status).',
+      [
+        '@alias'  => $alias,
+        '@dest'   => $destination,
+        '@status' => $status,
+      ]
+    );
+  }
+}
+
+/**
+ * Returns the destination for the best-matching prefix rule, or NULL.
+ *
+ * Longest-prefix match wins. Prefix comparison is case-sensitive.
+ */
+function _nhmrc_archive_redirect_match_rule(string $path, array $rules): ?string {
+  $best_dest = NULL;
+  $best_len  = 0;
+
+  foreach ($rules as $rule) {
+    $prefix = $rule['source_prefix'] ?? '';
+    if ($prefix === '') {
+      continue;
+    }
+    if (!str_starts_with($prefix, '/')) {
+      $prefix = '/' . $prefix;
+    }
+    if (str_starts_with($path, $prefix) && strlen($prefix) > $best_len) {
+      $best_len  = strlen($prefix);
+      $best_dest = $rule['destination'] ?? '';
+    }
+  }
+
+  return ($best_dest !== NULL && $best_dest !== '') ? $best_dest : NULL;
+}

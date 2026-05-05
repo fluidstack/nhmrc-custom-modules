@@ -1,0 +1,46 @@
+nhmrc_archive_redirect.settings:
+  type: config_object
+  label: 'Archive redirect settings'
+  mapping:
+    enabled_bundles:
+      type: mapping
+      label: 'Enabled bundles'
+      mapping:
+        '*':
+          type: boolean
+          label: 'Enabled'
+    content_type_paths:
+      type: mapping
+      label: 'Content type redirect paths'
+      mapping:
+        '*':
+          type: string
+          label: 'Redirect path'
+    fallback_path:
+      type: string
+      label: 'Default fallback path'
+    status_code:
+      type: integer
+      label: 'Redirect status code'
+    log_redirects:
+      type: boolean
+      label: 'Log redirects'
+    bypass_for_editors:
+      type: boolean
+      label: 'Allow editors to bypass the redirect and preview unpublished content'
+    preview_token_param:
+      type: string
+      label: 'Preview token query parameter name'
+    delete_path_rules:
+      type: sequence
+      label: 'Delete path rules'
+      sequence:
+        type: mapping
+        label: 'Rule'
+        mapping:
+          source_prefix:
+            type: string
+            label: 'Source path prefix'
+          destination:
+            type: string
+            label: 'Redirect destination'

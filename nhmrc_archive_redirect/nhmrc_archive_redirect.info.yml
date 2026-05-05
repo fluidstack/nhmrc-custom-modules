@@ -1,0 +1,7 @@
+name: NHMRC Archive Redirect
+type: module
+description: Redirects unpublished node pages to configured landing paths per content type, with optional SEO redirects on delete.
+core_version_requirement: ^10 || ^11
+package: Custom
+dependencies:
+  - drupal:node
