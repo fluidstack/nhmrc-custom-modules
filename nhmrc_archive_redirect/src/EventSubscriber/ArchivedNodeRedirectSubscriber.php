@@ -338,7 +338,14 @@ final class ArchivedNodeRedirectSubscriber implements EventSubscriberInterface {
     $cache_metadata = new CacheableMetadata();
     $cache_metadata->addCacheTags(['node:' . $node->id()]);
     $cache_metadata->addCacheContexts(['url.path']);
+    $cache_metadata->setCacheMaxAge(0);
     $response->addCacheableDependency($cache_metadata);
+
+    // Prevent reverse proxies (Varnish, CloudFront, CDN) from caching this
+    // redirect -- they don't understand Drupal cache tags and would serve a
+    // stale 302 even after the node is re-published.
+    $response->headers->set('Cache-Control', 'no-store, must-revalidate');
+    $response->headers->set('Surrogate-Control', 'no-store');
 
     return $response;
   }

@@ -132,7 +132,14 @@ final class DeletedPageRedirectSubscriber implements EventSubscriberInterface {
     $cache_metadata = new CacheableMetadata();
     $cache_metadata->addCacheTags(['nhmrc_archive_redirect:source:' . $source]);
     $cache_metadata->addCacheContexts(['url.path']);
+    $cache_metadata->setCacheMaxAge(0);
     $response->addCacheableDependency($cache_metadata);
+
+    // Prevent reverse proxies (Varnish, CloudFront, CDN) from caching this
+    // redirect -- they don't understand Drupal cache tags and would serve a
+    // stale 302 even after the path is reclaimed by new content.
+    $response->headers->set('Cache-Control', 'no-store, must-revalidate');
+    $response->headers->set('Surrogate-Control', 'no-store');
 
     $event->setResponse($response);
   }
