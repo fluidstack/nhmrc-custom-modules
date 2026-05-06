@@ -5,9 +5,39 @@
  * Hook implementations for the NHMRC archive redirect module.
  */
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Url;
 use Drupal\node\NodeInterface;
+
+/**
+ * Invalidate cached redirects when a node transitions to published.
+ *
+ * When a node is re-published after being unpublished, any cached redirect
+ * responses (in Internal Page Cache or Dynamic Page Cache) tagged with this
+ * node's cache tag are invalidated so visitors see the live page immediately.
+ */
+function nhmrc_archive_redirect_entity_update(EntityInterface $entity): void {
+  if (!$entity instanceof NodeInterface) {
+    return;
+  }
+
+  // Detect unpublished → published transition.
+  if (!$entity->isPublished() || !isset($entity->original) || $entity->original->isPublished()) {
+    return;
+  }
+
+  Cache::invalidateTags(['node:' . $entity->id()]);
+
+  // Also invalidate stored-redirect cache tag for this node's alias so the
+  // DeletedPageRedirectSubscriber's cached responses are evicted.
+  $alias = \Drupal::service('path_alias.manager')
+    ->getAliasByPath('/node/' . $entity->id());
+  if ($alias && $alias !== '/node/' . $entity->id()) {
+    $source = ltrim($alias, '/');
+    Cache::invalidateTags(['nhmrc_archive_redirect:source:' . $source]);
+  }
+}
 
 /**
  * Store the node alias before deletion so it is available in hook_entity_delete.

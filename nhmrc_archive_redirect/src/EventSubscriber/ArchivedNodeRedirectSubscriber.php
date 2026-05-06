@@ -2,10 +2,12 @@
 
 namespace Drupal\nhmrc_archive_redirect\EventSubscriber;
 
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Routing\CurrentRouteMatch;
+use Drupal\Core\Routing\LocalRedirectResponse;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Url;
 use Drupal\node\NodeInterface;
@@ -303,7 +305,16 @@ final class ArchivedNodeRedirectSubscriber implements EventSubscriberInterface {
       );
     }
 
-    return new RedirectResponse($destination, $status);
+    $response = new LocalRedirectResponse($destination, $status);
+
+    // Attach cache metadata so Internal Page Cache and Dynamic Page Cache
+    // invalidate this redirect when the node is re-published.
+    $cache_metadata = new CacheableMetadata();
+    $cache_metadata->addCacheTags(['node:' . $node->id()]);
+    $cache_metadata->addCacheContexts(['url.path']);
+    $response->addCacheableDependency($cache_metadata);
+
+    return $response;
   }
 
   /**

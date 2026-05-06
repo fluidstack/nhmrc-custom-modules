@@ -2,12 +2,13 @@
 
 namespace Drupal\nhmrc_archive_redirect\EventSubscriber;
 
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Routing\LocalRedirectResponse;
 use Drupal\Core\Url;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -114,7 +115,16 @@ final class DeletedPageRedirectSubscriber implements EventSubscriberInterface {
       );
     }
 
-    $event->setResponse(new RedirectResponse($destination, $status));
+    $response = new LocalRedirectResponse($destination, $status);
+
+    // Attach cache metadata so the stored redirect is invalidated when the
+    // path alias is reclaimed by new or re-published content.
+    $cache_metadata = new CacheableMetadata();
+    $cache_metadata->addCacheTags(['nhmrc_archive_redirect:source:' . $source]);
+    $cache_metadata->addCacheContexts(['url.path']);
+    $response->addCacheableDependency($cache_metadata);
+
+    $event->setResponse($response);
   }
 
   /**

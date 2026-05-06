@@ -494,6 +494,44 @@ class ArchiveRedirectBehaviorTest extends BrowserTestBase {
   }
 
   /**
+   * Re-publishing a node invalidates cached redirects so the page is served.
+   *
+   * Scenario:
+   *   - Unpublished node with alias /funding/cache-test.
+   *   - Rule: source_prefix=/funding/ → destination=/.
+   *   - Anonymous visit triggers redirect (cached by Internal Page Cache).
+   *   - Node is re-published.
+   *   - Next anonymous visit must reach the published page (200), not the
+   *     stale cached redirect.
+   *
+   * This exercises hook_entity_update() cache tag invalidation.
+   */
+  public function testRepublishedNodeIsNotRedirectedFromCache(): void {
+    $node = $this->createUnpublishedNode('/funding/cache-test');
+
+    $this->setPathPrefixRules([
+      ['source_prefix' => '/funding/', 'destination' => '/'],
+    ]);
+
+    // First visit: redirect fires (and response is cached).
+    $this->drupalGet('/funding/cache-test');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->addressEquals('/');
+
+    // Re-publish the node. This should invalidate the cached redirect via
+    // hook_entity_update() calling Cache::invalidateTags().
+    $node->setPublished();
+    $node->save();
+
+    // Grant anonymous access to content so the published page is viewable.
+    // (Already granted in setUp, but re-affirm the expectation.)
+    $this->drupalGet('/funding/cache-test');
+    $this->assertSession()->statusCodeEquals(200);
+    // Must be on the node's alias URL — NOT redirected to /.
+    $this->assertSession()->addressEquals('/funding/cache-test');
+  }
+
+  /**
    * A published node is never redirected, even when a prefix rule would match.
    *
    * Sanity check: the subscriber must exit early for published nodes, so an
