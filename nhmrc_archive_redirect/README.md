@@ -28,9 +28,20 @@ This module provides:
 - **Logging:** optional Notice-level logs on redirect events
 - **SEO delete redirects (optional):** create stored Redirect entities when content is deleted (requires Redirect module enabled)
 
+### Cache integration (Internal Page Cache & Dynamic Page Cache)
+
+Redirect responses are fully cacheable and correctly integrate with both Drupal's **Internal Page Cache** and **Dynamic Page Cache** modules:
+
+- All redirect responses use `LocalRedirectResponse` (restricts to internal paths) with proper cache metadata attached.
+- Each redirect is tagged with the originating node's cache tag (`node:{nid}`) and varies by `url.path` cache context.
+- When a node transitions from unpublished to published, the module's `hook_entity_update()` invalidates the relevant cache tags, immediately evicting any stale cached redirects.
+- Stored delete-page redirects carry a custom cache tag (`nhmrc_archive_redirect:source:{path}`) so they are also invalidated when the path is reclaimed by new or re-published content.
+
+This means visitors see the live page immediately after re-publication, with no manual cache clearing required.
+
 ### Safety / guardrails
 
-- **Internal paths only**
+- **Internal paths only** (enforced via `LocalRedirectResponse`)
 - **Front page (`/`) is not allowed** (restricted to "normal internal paths only")
 - **Loop protection:** if the current path equals the destination, no redirect is performed
 - Only runs for `entity.node.canonical` requests, and only for unpublished nodes
@@ -81,10 +92,12 @@ This module provides:
 ```
 nhmrc_archive_redirect/
   nhmrc_archive_redirect.info.yml
+  nhmrc_archive_redirect.install
   nhmrc_archive_redirect.routing.yml
   nhmrc_archive_redirect.links.menu.yml
+  nhmrc_archive_redirect.permissions.yml
   nhmrc_archive_redirect.services.yml
-  nhmrc_archive_redirect.module
+  nhmrc_archive_redirect.module              # hook_entity_update (cache invalidation), hook_entity_predelete/delete
   config/
     install/
       nhmrc_archive_redirect.settings.yml
@@ -92,8 +105,17 @@ nhmrc_archive_redirect/
       nhmrc_archive_redirect.schema.yml
   src/
     EventSubscriber/
-      ArchivedNodeRedirectSubscriber.php
+      ArchivedNodeRedirectSubscriber.php     # Runtime redirects for unpublished nodes (onRequest + onException)
+      DeletedPageRedirectSubscriber.php      # Serves stored redirects for previously deleted node URLs
     Form/
       ArchiveRedirectSettingsForm.php
+  tests/
+    src/
+      Functional/
+        ArchiveRedirectBehaviorTest.php
+      FunctionalJavascript/
+        ArchiveRedirectSettingsFormTest.php
+      Unit/
+        RemovePathRuleTest.php
   README.md
 ```
