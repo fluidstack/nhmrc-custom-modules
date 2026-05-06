@@ -94,6 +94,7 @@ final class DeletedPageRedirectSubscriber implements EventSubscriberInterface {
       return;
     }
 
+    $logger = $this->loggerFactory->get('nhmrc_archive_redirect');
     $destination = $record['destination'];
 
     // Resolve <front> to the real front-page URL.
@@ -103,9 +104,18 @@ final class DeletedPageRedirectSubscriber implements EventSubscriberInterface {
 
     $status = (int) $record['status_code'];
 
+    $logger->debug(
+      'DeletedPageRedirectSubscriber serving stored redirect: @source → @dest (@status).',
+      [
+        '@source' => '/' . $source,
+        '@dest'   => $destination,
+        '@status' => $status,
+      ]
+    );
+
     $config = $this->configFactory->get('nhmrc_archive_redirect.settings');
     if ($config->get('log_redirects')) {
-      $this->loggerFactory->get('nhmrc_archive_redirect')->notice(
+      $logger->notice(
         'Served stored redirect for deleted page @source → @dest (@status).',
         [
           '@source' => '/' . $source,

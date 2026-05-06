@@ -22,20 +22,78 @@ function nhmrc_archive_redirect_entity_update(EntityInterface $entity): void {
     return;
   }
 
+  $logger = \Drupal::logger('nhmrc_archive_redirect');
+
+  $was_published = isset($entity->original) && $entity->original->isPublished();
+  $is_published = $entity->isPublished();
+
+  $logger->debug(
+    'hook_entity_update: node @nid, was_published: @was, is_published: @is.',
+    [
+      '@nid' => $entity->id(),
+      '@was' => $was_published ? 'yes' : 'no',
+      '@is'  => $is_published ? 'yes' : 'no',
+    ]
+  );
+
   // Detect unpublished → published transition.
-  if (!$entity->isPublished() || !isset($entity->original) || $entity->original->isPublished()) {
+  if (!$is_published || !isset($entity->original) || $was_published) {
     return;
   }
 
+  $logger->notice(
+    'Node @nid transitioned from unpublished to published. Invalidating caches.',
+    ['@nid' => $entity->id()]
+  );
+
+  // Invalidate the node's cache tag (also done by core, but explicit for clarity).
   Cache::invalidateTags(['node:' . $entity->id()]);
 
-  // Also invalidate stored-redirect cache tag for this node's alias so the
-  // DeletedPageRedirectSubscriber's cached responses are evicted.
+  // Invalidate stored-redirect cache tags for both the alias and raw node path.
+  $tags_to_invalidate = ['nhmrc_archive_redirect:source:node/' . $entity->id()];
+
   $alias = \Drupal::service('path_alias.manager')
     ->getAliasByPath('/node/' . $entity->id());
   if ($alias && $alias !== '/node/' . $entity->id()) {
     $source = ltrim($alias, '/');
-    Cache::invalidateTags(['nhmrc_archive_redirect:source:' . $source]);
+    $tags_to_invalidate[] = 'nhmrc_archive_redirect:source:' . $source;
+  }
+
+  Cache::invalidateTags($tags_to_invalidate);
+
+  $logger->debug(
+    'Invalidated cache tags: @tags. Alias resolved to: @alias.',
+    [
+      '@tags'  => implode(', ', $tags_to_invalidate),
+      '@alias' => $alias ?: '(none)',
+    ]
+  );
+
+  // Remove any stored redirect records for this node's paths so the
+  // DeletedPageRedirectSubscriber does not serve stale redirects.
+  $database = \Drupal::database();
+  $sources_to_delete = ['node/' . $entity->id()];
+  if ($alias && $alias !== '/node/' . $entity->id()) {
+    $sources_to_delete[] = ltrim($alias, '/');
+  }
+
+  try {
+    $deleted = $database->delete('nhmrc_archive_redirect_records')
+      ->condition('source', $sources_to_delete, 'IN')
+      ->execute();
+    if ($deleted > 0) {
+      $logger->notice(
+        'Removed @count stored redirect record(s) for re-published node @nid (paths: @paths).',
+        [
+          '@count' => $deleted,
+          '@nid'   => $entity->id(),
+          '@paths' => implode(', ', $sources_to_delete),
+        ]
+      );
+    }
+  }
+  catch (\Exception $e) {
+    // Table may not exist yet.
   }
 }
 

@@ -86,7 +86,22 @@ final class ArchivedNodeRedirectSubscriber implements EventSubscriberInterface {
     }
 
     $node = $this->routeMatch->getParameter('node');
-    if (!$node instanceof NodeInterface || $node->isPublished()) {
+    if (!$node instanceof NodeInterface) {
+      return;
+    }
+
+    $logger = $this->loggerFactory->get('nhmrc_archive_redirect');
+    $logger->debug(
+      'onRequest fired for node @nid (published: @pub, path: @path, user: @uid).',
+      [
+        '@nid'  => $node->id(),
+        '@pub'  => $node->isPublished() ? 'yes' : 'no',
+        '@path' => $event->getRequest()->getPathInfo(),
+        '@uid'  => $this->currentUser->id(),
+      ]
+    );
+
+    if ($node->isPublished()) {
       return;
     }
 
@@ -143,15 +158,25 @@ final class ArchivedNodeRedirectSubscriber implements EventSubscriberInterface {
       }
     }
 
-    if (!$node instanceof NodeInterface || $node->isPublished()) {
+    if (!$node instanceof NodeInterface) {
       return;
     }
 
-    // Users who can bypass the redirect are allowed to see the node.
-    // We do not suppress the original exception here — Drupal will still
-    // enforce its own access control (e.g. the 403 page for users who
-    // lack node-view permission but do have the bypass-redirect permission).
-    // The bypass only prevents the redirect from overriding that flow.
+    $logger = $this->loggerFactory->get('nhmrc_archive_redirect');
+    $logger->debug(
+      'onException fired for node @nid (published: @pub, path: @path, user: @uid).',
+      [
+        '@nid'  => $node->id(),
+        '@pub'  => $node->isPublished() ? 'yes' : 'no',
+        '@path' => $request->getPathInfo(),
+        '@uid'  => $this->currentUser->id(),
+      ]
+    );
+
+    if ($node->isPublished()) {
+      return;
+    }
+
     if ($this->userCanBypass()) {
       return;
     }
@@ -159,6 +184,7 @@ final class ArchivedNodeRedirectSubscriber implements EventSubscriberInterface {
     $response = $this->buildRedirectResponse($node, $request->getPathInfo());
     if ($response !== NULL) {
       $event->setResponse($response);
+      $event->stopPropagation();
     }
   }
 
