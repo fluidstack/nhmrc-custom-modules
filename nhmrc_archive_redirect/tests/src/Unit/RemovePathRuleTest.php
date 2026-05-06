@@ -48,6 +48,7 @@ class RemovePathRuleTest extends UnitTestCase {
    *   The raw user input array (simulates POST data).
    *
    * @return \Drupal\Core\Form\FormStateInterface|\PHPUnit\Framework\MockObject\MockObject
+   *   A mock form state with working get/set/getUserInput/setUserInput.
    */
   private function createFormState(array $userInput): FormStateInterface {
     $formState = $this->createMock(FormStateInterface::class);

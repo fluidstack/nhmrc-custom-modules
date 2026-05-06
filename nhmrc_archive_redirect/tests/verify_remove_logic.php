@@ -10,16 +10,25 @@
  * Run with: php tests/verify_remove_logic.php
  */
 
-$pass = 0;
-$fail = 0;
+$_nhmrc_archive_redirect_results = ['pass' => 0, 'fail' => 0];
 
+/**
+ * Asserts that two values are strictly equal, tracking pass/fail counts.
+ *
+ * @param mixed $expected
+ *   The expected value.
+ * @param mixed $actual
+ *   The actual value to compare.
+ * @param string $message
+ *   A description of the assertion.
+ */
 function assert_equals($expected, $actual, string $message): void {
-  global $pass, $fail;
+  global $_nhmrc_archive_redirect_results;
   if ($expected === $actual) {
-    $pass++;
+    $_nhmrc_archive_redirect_results['pass']++;
   }
   else {
-    $fail++;
+    $_nhmrc_archive_redirect_results['fail']++;
     echo "FAIL: {$message}\n";
     echo "  Expected: " . var_export($expected, TRUE) . "\n";
     echo "  Actual:   " . var_export($actual, TRUE) . "\n";
@@ -161,5 +170,5 @@ assert_equals('/events/', $rules[1]['source_prefix'], 'Second rule unchanged');
 
 // ---- Summary ----
 echo "\n";
-echo "Results: {$pass} passed, {$fail} failed\n";
-exit($fail > 0 ? 1 : 0);
+echo "Results: {$_nhmrc_archive_redirect_results['pass']} passed, {$_nhmrc_archive_redirect_results['fail']} failed\n";
+exit($_nhmrc_archive_redirect_results['fail'] > 0 ? 1 : 0);
