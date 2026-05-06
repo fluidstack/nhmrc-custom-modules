@@ -312,8 +312,15 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
     if ($row_key >= 0) {
       unset($input[$row_key]);
     }
-    $rules = $this->extractRulesFromInput(array_values($input));
+    $input = array_values($input);
+    $rules = $this->extractRulesFromInput($input);
     $form_state->set('path_rules', $rules);
+
+    // Synchronise raw user input so Drupal's form rebuild uses the corrected
+    // row values instead of stale positional POST data.
+    $raw['path_rules']['table'] = $input;
+    $form_state->setUserInput($raw);
+
     $form_state->setRebuild();
   }
 
