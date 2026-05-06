@@ -1,7 +1,7 @@
 enabled_bundles: {  }
 content_type_paths: {  }
 fallback_path: ''
-status_code: 302
+status_code: 301
 log_redirects: false
 bypass_for_editors: true
 delete_path_rules: [  ]
