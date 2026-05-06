@@ -8,7 +8,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Path\PathValidatorInterface;
 use Drupal\nhmrc_archive_redirect\Form\ArchiveRedirectSettingsForm;
-use PHPUnit\Framework\TestCase;
+use Drupal\Tests\UnitTestCase;
 
 /**
  * Unit tests for the removePathRule AJAX submit handler.
@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
  * @group nhmrc_archive_redirect
  * @coversDefaultClass \Drupal\nhmrc_archive_redirect\Form\ArchiveRedirectSettingsForm
  */
-class RemovePathRuleTest extends TestCase {
+class RemovePathRuleTest extends UnitTestCase {
 
   /**
    * Creates a form instance with mocked dependencies.
