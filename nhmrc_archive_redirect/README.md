@@ -1,6 +1,6 @@
-# NHMRC Archive Redirect (Drupal 10)
+# NHMRC Archive Redirect (Drupal 10/11)
 
-A lightweight Drupal 10 custom module that automatically redirects requests for **unpublished ("archived") nodes** to a configured **landing page** (internal path), based on the node's **content type (bundle)**. It also optionally creates **stored Redirect entities on delete** (for SEO/permanent external link hygiene) when the contrib **Redirect** module is enabled.
+A lightweight Drupal custom module that automatically redirects requests for **unpublished ("archived") nodes** to a configured **landing page** (internal path), based on the node's **content type (bundle)**. It also creates **stored redirect records on delete** (for SEO/permanent external link hygiene) using path-prefix rules.
 
 ---
 
@@ -12,8 +12,11 @@ This module provides:
 
 - **Runtime redirects for unpublished nodes** (avoids 403/denied responses)
 - An **admin UI** to manage redirect destinations per content type
+- **Path-prefix rules** for fine-grained control over redirect destinations
 - A **fallback path** for any enabled type without a specific mapping
-- Optional **Redirect entity creation on node delete** (stored 301 redirects)
+- **Stored redirect records on node delete** (matching path-prefix rules)
+- A **stored redirects listing page** for visibility into all active redirect records
+- A **purge function** to bulk-remove stored records
 
 ---
 
@@ -25,8 +28,17 @@ This module provides:
 - **Per-bundle enable/disable:** bundles are loaded dynamically from Drupal; admins choose which bundles apply
 - **Per-bundle destination path:** internal path only (e.g. `/about-us/news-centre`)
 - **Fallback destination path:** internal path only, used when a bundle is enabled but no mapping exists
+- **Delete path rules:** prefix-based rules that determine redirect destinations when nodes are deleted
 - **Logging:** optional Notice-level logs on redirect events
-- **SEO delete redirects (optional):** create stored Redirect entities when content is deleted (requires Redirect module enabled)
+- **Editor bypass:** configurable permission-based bypass so editors can preview unpublished content
+- **Preview token:** configurable query parameter for anonymous preview URLs
+
+### Stored redirects management
+
+- **Listing page** at `/admin/config/content/archive-redirects/stored` — sortable, paginated table showing all stored redirect records with source path, destination, status code, and creation date
+- **Path filter** — search stored redirects by source path substring
+- **Purge** — bulk delete all stored redirect records from the settings form
+- **Auto-sync** — when path rules are modified or removed, associated stored records are updated or deleted automatically
 
 ### Cache integration (Internal Page Cache & Dynamic Page Cache)
 
@@ -42,19 +54,16 @@ This means visitors see the live page immediately after re-publication, with no 
 ### Safety / guardrails
 
 - **Internal paths only** (enforced via `LocalRedirectResponse`)
-- **Front page (`/`) is not allowed** (restricted to "normal internal paths only")
 - **Loop protection:** if the current path equals the destination, no redirect is performed
-- Only runs for `entity.node.canonical` requests, and only for unpublished nodes
+- Only runs for `entity.node.canonical` requests (unpublished nodes) or stored-record lookups (deleted pages)
+- **No-store headers** prevent reverse proxies from caching stale redirects
 
 ---
 
 ## Requirements
 
-- Drupal Core: **^10**
+- Drupal Core: **^10 || ^11**
 - Core dependency: `node`
-- Optional: contrib **Redirect** module (`drupal/redirect`) if you want stored redirects on delete
-
-> Note: The module does **not** hard-depend on Redirect. If Redirect is not enabled, the "create redirects on delete" option will have no effect.
 
 ---
 
@@ -77,6 +86,11 @@ This means visitors see the live page immediately after re-publication, with no 
    /admin/config/content/archive-redirects
    ```
 
+4. View stored redirect records at:
+   ```
+   /admin/config/content/archive-redirects/stored
+   ```
+
 ---
 
 ## Recommended rollout
@@ -95,27 +109,22 @@ nhmrc_archive_redirect/
   nhmrc_archive_redirect.install
   nhmrc_archive_redirect.routing.yml
   nhmrc_archive_redirect.links.menu.yml
+  nhmrc_archive_redirect.links.task.yml       # Local task tabs (Settings / Stored redirects)
   nhmrc_archive_redirect.permissions.yml
   nhmrc_archive_redirect.services.yml
-  nhmrc_archive_redirect.module              # hook_entity_update (cache invalidation), hook_entity_predelete/delete
+  nhmrc_archive_redirect.module               # hook_entity_update (cache invalidation), hook_entity_predelete/delete
   config/
     install/
       nhmrc_archive_redirect.settings.yml
     schema/
       nhmrc_archive_redirect.schema.yml
   src/
+    Controller/
+      StoredRedirectsController.php           # Paginated listing of stored redirect records
     EventSubscriber/
-      ArchivedNodeRedirectSubscriber.php     # Runtime redirects for unpublished nodes (onRequest + onException)
-      DeletedPageRedirectSubscriber.php      # Serves stored redirects for previously deleted node URLs
+      ArchivedNodeRedirectSubscriber.php      # Runtime redirects for unpublished nodes (onRequest + onException)
+      DeletedPageRedirectSubscriber.php       # Serves stored redirects for previously deleted node URLs
     Form/
       ArchiveRedirectSettingsForm.php
-  tests/
-    src/
-      Functional/
-        ArchiveRedirectBehaviorTest.php
-      FunctionalJavascript/
-        ArchiveRedirectSettingsFormTest.php
-      Unit/
-        RemovePathRuleTest.php
   README.md
 ```

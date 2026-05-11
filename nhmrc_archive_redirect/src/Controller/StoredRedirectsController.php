@@ -66,7 +66,9 @@ class StoredRedirectsController extends ControllerBase {
       ];
     }
 
-    $build = [];
+    $build = [
+      '#cache' => ['max-age' => 0],
+    ];
 
     // Filter form.
     $build['filter'] = [

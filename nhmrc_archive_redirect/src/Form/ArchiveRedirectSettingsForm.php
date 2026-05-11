@@ -4,9 +4,11 @@ namespace Drupal\nhmrc_archive_redirect\Form;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Path\PathValidatorInterface;
 use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -31,23 +33,34 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
   protected EntityTypeManagerInterface $entityTypeManager;
 
   /**
-   * Constructs an ArchiveRedirectSettingsForm object.
+   * The database connection.
    *
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
-   *   The config factory.
-   * @param \Drupal\Core\Path\PathValidatorInterface $pathValidator
-   *   The path validator.
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
-   *   The entity type manager.
+   * @var \Drupal\Core\Database\Connection
+   */
+  protected Connection $database;
+
+  /**
+   * The logger channel.
+   *
+   * @var \Drupal\Core\Logger\LoggerChannelInterface
+   */
+  protected LoggerChannelInterface $logger;
+
+  /**
+   * Constructs an ArchiveRedirectSettingsForm object.
    */
   public function __construct(
     ConfigFactoryInterface $configFactory,
     PathValidatorInterface $pathValidator,
     EntityTypeManagerInterface $entityTypeManager,
+    Connection $database,
+    LoggerChannelInterface $logger,
   ) {
     parent::__construct($configFactory);
     $this->pathValidator = $pathValidator;
     $this->entityTypeManager = $entityTypeManager;
+    $this->database = $database;
+    $this->logger = $logger;
   }
 
   /**
@@ -58,6 +71,8 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       $container->get('config.factory'),
       $container->get('path.validator'),
       $container->get('entity_type.manager'),
+      $container->get('database'),
+      $container->get('logger.factory')->get('nhmrc_archive_redirect'),
     );
   }
 
@@ -262,7 +277,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
     // ----------------------------------------------------------------
     $record_count = 0;
     try {
-      $record_count = (int) \Drupal::database()
+      $record_count = (int) $this->database
         ->select('nhmrc_archive_redirect_records', 'r')
         ->countQuery()
         ->execute()
@@ -377,11 +392,8 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
    * Submit handler: purges all stored redirect records.
    */
   public function purgeAllRecords(array &$form, FormStateInterface $form_state): void {
-    $database = \Drupal::database();
-    $logger = \Drupal::logger('nhmrc_archive_redirect');
-
     try {
-      $count = (int) $database->select('nhmrc_archive_redirect_records', 'r')
+      $count = (int) $this->database->select('nhmrc_archive_redirect_records', 'r')
         ->countQuery()
         ->execute()
         ->fetchField();
@@ -391,7 +403,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
         return;
       }
 
-      $database->truncate('nhmrc_archive_redirect_records')->execute();
+      $this->database->truncate('nhmrc_archive_redirect_records')->execute();
 
       Cache::invalidateTags(['nhmrc_archive_redirect']);
 
@@ -400,7 +412,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
         ['@count' => $count]
       ));
 
-      $logger->notice('Admin purged all @count stored redirect record(s).', ['@count' => $count]);
+      $this->logger->notice('Admin purged all @count stored redirect record(s).', ['@count' => $count]);
     }
     catch (\Exception $e) {
       $this->messenger()->addError($this->t('Failed to purge stored redirects: @message', [
@@ -611,9 +623,6 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       $new_by_prefix[$rule['source_prefix']] = $rule['destination'];
     }
 
-    $database = \Drupal::database();
-    $logger = \Drupal::logger('nhmrc_archive_redirect');
-
     // Handle removed rules: delete stored records matching the prefix.
     foreach ($old_by_prefix as $prefix => $old_dest) {
       if (isset($new_by_prefix[$prefix])) {
@@ -622,7 +631,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       $source_pattern = ltrim($prefix, '/') . '%';
 
       try {
-        $affected = $database->select('nhmrc_archive_redirect_records', 'r')
+        $affected = $this->database->select('nhmrc_archive_redirect_records', 'r')
           ->fields('r', ['source'])
           ->condition('source', $source_pattern, 'LIKE')
           ->execute()
@@ -632,7 +641,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
           continue;
         }
 
-        $database->delete('nhmrc_archive_redirect_records')
+        $this->database->delete('nhmrc_archive_redirect_records')
           ->condition('source', $source_pattern, 'LIKE')
           ->execute();
 
@@ -645,7 +654,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
           ['@count' => $count, '@prefix' => $prefix, '@dest' => $old_dest]
         ));
 
-        $logger->notice(
+        $this->logger->notice(
           'Removed @count stored redirect record(s) for deleted rule @prefix → @dest.',
           ['@count' => $count, '@prefix' => $prefix, '@dest' => $old_dest]
         );
@@ -668,7 +677,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       $source_pattern = ltrim($prefix, '/') . '%';
 
       try {
-        $affected = $database->select('nhmrc_archive_redirect_records', 'r')
+        $affected = $this->database->select('nhmrc_archive_redirect_records', 'r')
           ->fields('r', ['source'])
           ->condition('source', $source_pattern, 'LIKE')
           ->execute()
@@ -678,7 +687,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
           continue;
         }
 
-        $database->update('nhmrc_archive_redirect_records')
+        $this->database->update('nhmrc_archive_redirect_records')
           ->fields(['destination' => $new_dest])
           ->condition('source', $source_pattern, 'LIKE')
           ->execute();
@@ -692,7 +701,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
           ['@count' => $count, '@new_dest' => $new_dest, '@old_dest' => $old_dest, '@prefix' => $prefix]
         ));
 
-        $logger->notice(
+        $this->logger->notice(
           'Updated @count stored redirect record(s): @prefix destinations changed from @old_dest to @new_dest.',
           ['@count' => $count, '@prefix' => $prefix, '@old_dest' => $old_dest, '@new_dest' => $new_dest]
         );
