@@ -256,6 +256,46 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       ];
     }
 
+    // ----------------------------------------------------------------
+    // Stored redirect records management
+    // ----------------------------------------------------------------
+    $record_count = 0;
+    try {
+      $record_count = (int) \Drupal::database()
+        ->select('nhmrc_archive_redirect_records', 'r')
+        ->countQuery()
+        ->execute()
+        ->fetchField();
+    }
+    catch (\Exception $e) {
+      // Table may not exist yet.
+    }
+
+    $form['stored_records'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Stored redirect records (@count)', ['@count' => $record_count]),
+      '#open' => FALSE,
+    ];
+
+    $form['stored_records']['info'] = [
+      '#markup' => '<p>' . $this->t(
+        'There are currently <strong>@count</strong> stored redirect record(s) in the database. These are created automatically when visitors hit archived or deleted pages.',
+        ['@count' => $record_count]
+      ) . '</p>',
+    ];
+
+    $form['stored_records']['purge'] = [
+      '#type' => 'submit',
+      '#value' => $this->t('Purge all stored redirects'),
+      '#submit' => ['::purgeAllRecords'],
+      '#limit_validation_errors' => [],
+      '#attributes' => [
+        'class' => ['button--danger'],
+        'onclick' => 'return confirm("Are you sure? This will permanently delete all ' . $record_count . ' stored redirect record(s). This action cannot be undone.");',
+      ],
+      '#disabled' => $record_count === 0,
+    ];
+
     return parent::buildForm($form, $form_state);
   }
 
@@ -323,6 +363,42 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
     $form_state->setUserInput($raw);
 
     $form_state->setRebuild();
+  }
+
+  /**
+   * Submit handler: purges all stored redirect records.
+   */
+  public function purgeAllRecords(array &$form, FormStateInterface $form_state): void {
+    $database = \Drupal::database();
+    $logger = \Drupal::logger('nhmrc_archive_redirect');
+
+    try {
+      $count = (int) $database->select('nhmrc_archive_redirect_records', 'r')
+        ->countQuery()
+        ->execute()
+        ->fetchField();
+
+      if ($count === 0) {
+        $this->messenger()->addWarning($this->t('No stored redirect records to purge.'));
+        return;
+      }
+
+      $database->truncate('nhmrc_archive_redirect_records')->execute();
+
+      Cache::invalidateTags(['nhmrc_archive_redirect']);
+
+      $this->messenger()->addStatus($this->t(
+        'Purged @count stored redirect record(s).',
+        ['@count' => $count]
+      ));
+
+      $logger->notice('Admin purged all @count stored redirect record(s).', ['@count' => $count]);
+    }
+    catch (\Exception $e) {
+      $this->messenger()->addError($this->t('Failed to purge stored redirects: @message', [
+        '@message' => $e->getMessage(),
+      ]));
+    }
   }
 
   /**
