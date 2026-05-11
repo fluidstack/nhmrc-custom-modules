@@ -2,6 +2,7 @@
 
 namespace Drupal\nhmrc_archive_redirect\Form;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
@@ -489,6 +490,9 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       ];
     }
 
+    // Sync stored redirect records when rules are removed or destinations change.
+    $this->syncStoredRecords($delete_path_rules);
+
     $this->config('nhmrc_archive_redirect.settings')
       ->set('enabled_bundles', $enabled_bundles)
       ->set('content_type_paths', $content_type_paths)
@@ -501,6 +505,118 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       ->save();
 
     parent::submitForm($form, $form_state);
+  }
+
+  /**
+   * Syncs stored redirect records when path rules are removed or changed.
+   *
+   * @param array $new_rules
+   *   The new set of path rules about to be saved.
+   */
+  private function syncStoredRecords(array $new_rules): void {
+    $config = $this->config('nhmrc_archive_redirect.settings');
+    $old_rules = $config->get('delete_path_rules') ?? [];
+
+    // Index old and new rules by prefix for comparison.
+    $old_by_prefix = [];
+    foreach ($old_rules as $rule) {
+      $old_by_prefix[$rule['source_prefix']] = $rule['destination'];
+    }
+    $new_by_prefix = [];
+    foreach ($new_rules as $rule) {
+      $new_by_prefix[$rule['source_prefix']] = $rule['destination'];
+    }
+
+    $database = \Drupal::database();
+    $logger = \Drupal::logger('nhmrc_archive_redirect');
+
+    // Handle removed rules: delete stored records matching the prefix.
+    foreach ($old_by_prefix as $prefix => $old_dest) {
+      if (isset($new_by_prefix[$prefix])) {
+        continue;
+      }
+      $source_pattern = ltrim($prefix, '/') . '%';
+
+      try {
+        $affected = $database->select('nhmrc_archive_redirect_records', 'r')
+          ->fields('r', ['source'])
+          ->condition('source', $source_pattern, 'LIKE')
+          ->execute()
+          ->fetchCol();
+
+        if (empty($affected)) {
+          continue;
+        }
+
+        $database->delete('nhmrc_archive_redirect_records')
+          ->condition('source', $source_pattern, 'LIKE')
+          ->execute();
+
+        $tags = array_map(fn($s) => 'nhmrc_archive_redirect:source:' . $s, $affected);
+        Cache::invalidateTags($tags);
+
+        $count = count($affected);
+        $this->messenger()->addStatus($this->t(
+          'Removed @count stored redirect record(s) associated with deleted rule @prefix → @dest.',
+          ['@count' => $count, '@prefix' => $prefix, '@dest' => $old_dest]
+        ));
+
+        $logger->notice(
+          'Removed @count stored redirect record(s) for deleted rule @prefix → @dest.',
+          ['@count' => $count, '@prefix' => $prefix, '@dest' => $old_dest]
+        );
+      }
+      catch (\Exception $e) {
+        // Table may not exist yet.
+      }
+    }
+
+    // Handle changed destinations: update stored records to the new destination.
+    foreach ($new_by_prefix as $prefix => $new_dest) {
+      if (!isset($old_by_prefix[$prefix])) {
+        continue;
+      }
+      $old_dest = $old_by_prefix[$prefix];
+      if ($old_dest === $new_dest) {
+        continue;
+      }
+
+      $source_pattern = ltrim($prefix, '/') . '%';
+
+      try {
+        $affected = $database->select('nhmrc_archive_redirect_records', 'r')
+          ->fields('r', ['source'])
+          ->condition('source', $source_pattern, 'LIKE')
+          ->execute()
+          ->fetchCol();
+
+        if (empty($affected)) {
+          continue;
+        }
+
+        $database->update('nhmrc_archive_redirect_records')
+          ->fields(['destination' => $new_dest])
+          ->condition('source', $source_pattern, 'LIKE')
+          ->execute();
+
+        $tags = array_map(fn($s) => 'nhmrc_archive_redirect:source:' . $s, $affected);
+        Cache::invalidateTags($tags);
+
+        $count = count($affected);
+        $this->messenger()->addStatus($this->t(
+          'Updated @count stored redirect record(s) to new destination @new_dest (previously @old_dest) for prefix @prefix.',
+          ['@count' => $count, '@new_dest' => $new_dest, '@old_dest' => $old_dest, '@prefix' => $prefix]
+        ));
+
+        $logger->notice(
+          'Updated @count stored redirect record(s): @prefix destinations changed from @old_dest to @new_dest.',
+          ['@count' => $count, '@prefix' => $prefix, '@old_dest' => $old_dest, '@new_dest' => $new_dest]
+        );
+      }
+      catch (\Exception $e) {
+        // Table may not exist yet.
+      }
+    }
   }
 
 }
