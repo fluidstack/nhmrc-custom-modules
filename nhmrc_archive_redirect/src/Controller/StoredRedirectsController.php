@@ -113,12 +113,11 @@ final class StoredRedirectsController extends ControllerBase {
     // Summary.
     $total = 0;
     try {
-      $count_query = $this->database->select('nhmrc_archive_redirect_records', 'r')
-        ->countQuery();
+      $count_select = $this->database->select('nhmrc_archive_redirect_records', 'r');
       if ($filter !== '') {
-        $count_query->condition('source', '%' . $this->database->escapeLike($filter) . '%', 'LIKE');
+        $count_select->condition('source', '%' . $this->database->escapeLike($filter) . '%', 'LIKE');
       }
-      $total = (int) $count_query->execute()->fetchField();
+      $total = (int) $count_select->countQuery()->execute()->fetchField();
     }
     catch (\Exception $e) {
     }
