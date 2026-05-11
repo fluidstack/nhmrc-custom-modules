@@ -13,6 +13,6 @@ services:
 
   nhmrc_archive_redirect.deleted_page_subscriber:
     class: Drupal\nhmrc_archive_redirect\EventSubscriber\DeletedPageRedirectSubscriber
-    arguments: ['@database', '@config.factory', '@logger.factory']
+    arguments: ['@database', '@config.factory', '@logger.factory', '@current_user']
     tags:
       - { name: event_subscriber }

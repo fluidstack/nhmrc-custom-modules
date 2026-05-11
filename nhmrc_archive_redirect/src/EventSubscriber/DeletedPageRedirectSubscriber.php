@@ -7,6 +7,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Routing\LocalRedirectResponse;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Url;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +29,7 @@ final class DeletedPageRedirectSubscriber implements EventSubscriberInterface {
     private readonly Connection $database,
     private readonly ConfigFactoryInterface $configFactory,
     private readonly LoggerChannelFactoryInterface $loggerFactory,
+    private readonly AccountProxyInterface $currentUser,
   ) {}
 
   /**
@@ -50,6 +52,10 @@ final class DeletedPageRedirectSubscriber implements EventSubscriberInterface {
     $request = $event->getRequest();
 
     if ($this->requestHasAuNhmrcToken($request)) {
+      return;
+    }
+
+    if ($this->userCanBypass()) {
       return;
     }
 
@@ -142,6 +148,22 @@ final class DeletedPageRedirectSubscriber implements EventSubscriberInterface {
     $response->headers->set('Surrogate-Control', 'no-store');
 
     $event->setResponse($response);
+  }
+
+  /**
+   * Returns TRUE when the current user should bypass the redirect.
+   *
+   * Mirrors the identical logic in ArchivedNodeRedirectSubscriber. Bypass is
+   * active unless "bypass_for_editors" is explicitly set to FALSE. The user
+   * must hold either "bypass node access" or "preview unpublished content".
+   */
+  private function userCanBypass(): bool {
+    $config = $this->configFactory->get('nhmrc_archive_redirect.settings');
+    if ($config->get('bypass_for_editors') === FALSE) {
+      return FALSE;
+    }
+    return $this->currentUser->hasPermission('bypass node access')
+      || $this->currentUser->hasPermission('preview unpublished content');
   }
 
   /**
