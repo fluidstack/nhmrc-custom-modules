@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\nhmrc_archive_redirect\Controller;
 
-use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Datetime\DateFormatterInterface;
@@ -21,7 +20,6 @@ final class StoredRedirectsController extends ControllerBase {
   public function __construct(
     protected Connection $database,
     protected DateFormatterInterface $dateFormatter,
-    protected ConfigFactoryInterface $configFactory,
     protected AliasManagerInterface $aliasManager,
   ) {}
 
@@ -32,7 +30,6 @@ final class StoredRedirectsController extends ControllerBase {
     return new static(
       $container->get('database'),
       $container->get('date.formatter'),
-      $container->get('config.factory'),
       $container->get('path_alias.manager'),
     );
   }
@@ -195,7 +192,7 @@ final class StoredRedirectsController extends ControllerBase {
    *   Table rows for the archived redirects listing.
    */
   private function buildArchivedRows(string $filter): array {
-    $config = $this->configFactory->get('nhmrc_archive_redirect.settings');
+    $config = $this->config('nhmrc_archive_redirect.settings');
     $rules = $config->get('delete_path_rules') ?? [];
     $enabled_bundles = $config->get('enabled_bundles') ?? [];
     $content_type_paths = $config->get('content_type_paths') ?? [];
