@@ -10,6 +10,6 @@ nhmrc_archive_redirect.stored_redirects:
   path: '/admin/config/content/archive-redirects/stored'
   defaults:
     _controller: '\Drupal\nhmrc_archive_redirect\Controller\StoredRedirectsController::listing'
-    _title: 'Stored redirects'
+    _title: 'Active redirects'
   requirements:
     _permission: 'administer site configuration'
