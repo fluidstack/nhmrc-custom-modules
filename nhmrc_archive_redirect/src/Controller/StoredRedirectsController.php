@@ -25,7 +25,7 @@ class StoredRedirectsController extends ControllerBase {
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container): static {
-    return new static(
+    return new self(
       $container->get('database'),
       $container->get('date.formatter'),
     );
@@ -42,11 +42,14 @@ class StoredRedirectsController extends ControllerBase {
       ['data' => $this->t('Created'), 'field' => 'created', 'sort' => 'desc'],
     ];
 
-    $query = $this->database->select('nhmrc_archive_redirect_records', 'r')
-      ->fields('r', ['source', 'destination', 'status_code', 'created'])
+    $select = $this->database->select('nhmrc_archive_redirect_records', 'r')
+      ->fields('r', ['source', 'destination', 'status_code', 'created']);
+
+    /** @var \Drupal\Core\Database\Query\PagerSelectExtender $query */
+    $query = $select
       ->extend('\Drupal\Core\Database\Query\PagerSelectExtender')
-      ->extend('\Drupal\Core\Database\Query\TableSortExtender')
-      ->limit(50)
+      ->extend('\Drupal\Core\Database\Query\TableSortExtender');
+    $query->limit(50)
       ->orderByHeader($header);
 
     // Filter by source prefix if provided.
