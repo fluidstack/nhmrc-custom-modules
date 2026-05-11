@@ -1,0 +1,10 @@
+nhmrc_archive_redirect.settings_tab:
+  route_name: nhmrc_archive_redirect.settings
+  title: 'Settings'
+  base_route: nhmrc_archive_redirect.settings
+
+nhmrc_archive_redirect.stored_redirects_tab:
+  route_name: nhmrc_archive_redirect.stored_redirects
+  title: 'Stored redirects'
+  base_route: nhmrc_archive_redirect.settings
+  weight: 10

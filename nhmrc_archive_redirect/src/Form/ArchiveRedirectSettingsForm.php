@@ -8,6 +8,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Path\PathValidatorInterface;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -282,6 +283,13 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
         'There are currently <strong>@count</strong> stored redirect record(s) in the database. These are created automatically when visitors hit archived or deleted pages.',
         ['@count' => $record_count]
       ) . '</p>',
+    ];
+
+    $form['stored_records']['view_link'] = [
+      '#type' => 'link',
+      '#title' => $this->t('View all stored redirects'),
+      '#url' => Url::fromRoute('nhmrc_archive_redirect.stored_redirects'),
+      '#attributes' => ['class' => ['button']],
     ];
 
     $form['stored_records']['purge'] = [
