@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 /**
  * Provides a paginated listing of stored redirect records.
  */
-class StoredRedirectsController extends ControllerBase {
+final class StoredRedirectsController extends ControllerBase {
 
   public function __construct(
     protected Connection $database,
@@ -25,7 +25,7 @@ class StoredRedirectsController extends ControllerBase {
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container): static {
-    return new self(
+    return new static(
       $container->get('database'),
       $container->get('date.formatter'),
     );
