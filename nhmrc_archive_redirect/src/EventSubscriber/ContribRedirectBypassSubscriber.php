@@ -3,7 +3,9 @@
 namespace Drupal\nhmrc_archive_redirect\EventSubscriber;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Database\Connection;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
@@ -55,6 +57,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
     private readonly LoggerChannelFactoryInterface $loggerFactory,
     private readonly AliasManagerInterface $aliasManager,
     private readonly LanguageManagerInterface $languageManager,
+    private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
   /**
@@ -68,6 +71,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
       $container->get('logger.factory'),
       $container->get('path_alias.manager'),
       $container->get('language_manager'),
+      $container->get('entity_type.manager'),
     );
   }
 
@@ -221,7 +225,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
 
     // Delete via the entity API so cache tags and hooks fire correctly.
     try {
-      $storage = \Drupal::entityTypeManager()->getStorage('redirect');
+      $storage = $this->entityTypeManager->getStorage('redirect');
       $entities = $storage->loadMultiple($deleted_rids);
       if (!empty($entities)) {
         $storage->delete($entities);
@@ -260,7 +264,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
    * Wildcard mode (`*`) is intentionally excluded: it is a developer testing
    * convenience and should not trigger destructive deletions.
    */
-  private function requestHasExplicitToken(Request $request, $config): bool {
+  private function requestHasExplicitToken(Request $request, ImmutableConfig $config): bool {
     $param = (string) ($config->get('preview_token_param') ?? 'auNHMRC');
     if ($param === '' || $param === '*') {
       return FALSE;
@@ -275,7 +279,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
    * Keys are normalised internal paths (with leading slash). Used to confirm
    * a contrib Redirect entity targets a path we own before deleting it.
    */
-  private function buildManagedDestinationSet($config): array {
+  private function buildManagedDestinationSet(ImmutableConfig $config): array {
     $set = [];
 
     $rules = $config->get('delete_path_rules') ?? [];
