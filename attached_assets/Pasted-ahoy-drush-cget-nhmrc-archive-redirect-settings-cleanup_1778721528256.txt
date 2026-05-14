@@ -1,0 +1,36 @@
+ahoy drush cget nhmrc_archive_redirect.settings cleanup_contrib_redirects_on_republish
+'nhmrc_archive_redirect.settings:cleanup_contrib_redirects_on_republish': null[11:16 AM]ahoy drush php:eval '$n = \Drupal\node\Entity\Node::load(2666); $n->setUnpublished()->save(); $n->setPublished()->save(); echo "re-published\n";'
+ [error]  Error: Call to a member function setUnpublished() on null in eval() (line 1 of /app/vendor/drush/drush/src/Commands/core/PhpCommands.php(33) : eval()'d code) #0 /app/vendor/drush/drush/src/Commands/core/PhpCommands.php(33): eval()
+#1 [internal function]: Drush\Commands\core\PhpCommands->evaluate()
+#2 /app/vendor/consolidation/annotated-command/src/CommandProcessor.php(276): call_user_func_array()
+#3 /app/vendor/consolidation/annotated-command/src/CommandProcessor.php(212): Consolidation\AnnotatedCommand\CommandProcessor->runCommandCallback()
+#4 /app/vendor/consolidation/annotated-command/src/CommandProcessor.php(175): Consolidation\AnnotatedCommand\CommandProcessor->validateRunAndAlter()
+#5 /app/vendor/consolidation/annotated-command/src/AnnotatedCommand.php(389): Consolidation\AnnotatedCommand\CommandProcessor->process()
+#6 /app/vendor/symfony/console/Command/Command.php(326): Consolidation\AnnotatedCommand\AnnotatedCommand->execute()
+#7 /app/vendor/symfony/console/Application.php(1121): Symfony\Component\Console\Command\Command->run()
+#8 /app/vendor/drush/drush/src/Application.php(201): Symfony\Component\Console\Application->doRunCommand()
+#9 /app/vendor/symfony/console/Application.php(324): Drush\Application->doRunCommand()
+#10 /app/vendor/symfony/console/Application.php(175): Symfony\Component\Console\Application->doRun()
+#11 /app/vendor/drush/drush/src/Runtime/Runtime.php(113): Symfony\Component\Console\Application->run()
+#12 /app/vendor/drush/drush/src/Runtime/Runtime.php(40): Drush\Runtime\Runtime->doRun()
+#13 /app/vendor/drush/drush/drush.php(140): Drush\Runtime\Runtime->run()
+#14 /app/vendor/bin/drush.php(119): include('...')
+#15 {main}.
+Error: Call to a member function setUnpublished() on null in /app/vendor/drush/drush/src/Commands/core/PhpCommands.php(33) : eval()'d code on line 1 #0 /app/vendor/drush/drush/src/Commands/core/PhpCommands.php(33): eval()
+#1 [internal function]: Drush\Commands\core\PhpCommands->evaluate()
+#2 /app/vendor/consolidation/annotated-command/src/CommandProcessor.php(276): call_user_func_array()
+#3 /app/vendor/consolidation/annotated-command/src/CommandProcessor.php(212): Consolidation\AnnotatedCommand\CommandProcessor->runCommandCallback()
+#4 /app/vendor/consolidation/annotated-command/src/CommandProcessor.php(175): Consolidation\AnnotatedCommand\CommandProcessor->validateRunAndAlter()
+#5 /app/vendor/consolidation/annotated-command/src/AnnotatedCommand.php(389): Consolidation\AnnotatedCommand\CommandProcessor->process()
+#6 /app/vendor/symfony/console/Command/Command.php(326): Consolidation\AnnotatedCommand\AnnotatedCommand->execute()
+#7 /app/vendor/symfony/console/Application.php(1121): Symfony\Component\Console\Command\Command->run()
+#8 /app/vendor/drush/drush/src/Application.php(201): Symfony\Component\Console\Application->doRunCommand()
+#9 /app/vendor/symfony/console/Application.php(324): Drush\Application->doRunCommand()
+#10 /app/vendor/symfony/console/Application.php(175): Symfony\Component\Console\Application->doRun()
+#11 /app/vendor/drush/drush/src/Runtime/Runtime.php(113): Symfony\Component\Console\Application->run()
+#12 /app/vendor/drush/drush/src/Runtime/Runtime.php(40): Drush\Runtime\Runtime->doRun()
+#13 /app/vendor/drush/drush/drush.php(140): Drush\Runtime\Runtime->run()
+#14 /app/vendor/bin/drush.php(119): include('...')
+#15 {main}
+Error: Call to a member function setUnpublished() on null in eval() (line 1 of /app/vendor/drush/drush/src/Commands/core/PhpCommands.php(33) : eval()'d code).
+ [warning] Drush command terminated abnormally.
