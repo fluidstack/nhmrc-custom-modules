@@ -596,6 +596,8 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
     // Sync stored redirect records when rules are removed or destinations change.
     $this->syncStoredRecords($delete_path_rules);
 
+    $cleanup_contrib = (bool) $form_state->getValue(['behaviour', 'cleanup_contrib_redirects_on_republish']);
+
     $this->config('nhmrc_archive_redirect.settings')
       ->set('enabled_bundles', $enabled_bundles)
       ->set('content_type_paths', $content_type_paths)
@@ -604,7 +606,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       ->set('log_redirects', (bool) $form_state->getValue(['behaviour', 'log_redirects']))
       ->set('bypass_for_editors', (bool) $form_state->getValue(['behaviour', 'bypass_for_editors']))
       ->set('preview_token_param', trim((string) $form_state->getValue(['behaviour', 'preview_token_param'])))
-      ->set('cleanup_contrib_redirects_on_republish', (bool) $form_state->getValue(['behaviour', 'cleanup_contrib_redirects_on_republish']))
+      ->set('cleanup_contrib_redirects_on_republish', $cleanup_contrib)
       ->set('delete_path_rules', $delete_path_rules)
       ->save();
 
