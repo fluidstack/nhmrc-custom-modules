@@ -6,6 +6,8 @@ namespace Drupal\nhmrc_archive_redirect\Controller;
 
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Database\Connection;
+use Drupal\Core\Database\Query\PagerSelectExtender;
+use Drupal\Core\Database\Query\TableSortExtender;
 use Drupal\Core\Datetime\DateFormatterInterface;
 use Drupal\Core\Url;
 use Drupal\path_alias\AliasManagerInterface;
@@ -26,8 +28,8 @@ final class StoredRedirectsController extends ControllerBase {
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container): static {
-    return new static(
+  public static function create(ContainerInterface $container): self {
+    return new self(
       $container->get('database'),
       $container->get('date.formatter'),
       $container->get('path_alias.manager'),
@@ -128,12 +130,15 @@ final class StoredRedirectsController extends ControllerBase {
       $select = $this->database->select('nhmrc_archive_redirect_records', 'r')
         ->fields('r', ['source', 'destination', 'status_code', 'created']);
 
-      /** @var \Drupal\Core\Database\Query\PagerSelectExtender $query */
-      $query = $select
-        ->extend('\Drupal\Core\Database\Query\PagerSelectExtender')
-        ->extend('\Drupal\Core\Database\Query\TableSortExtender');
-      $query->limit(50)
-        ->orderByHeader($header);
+      // Split the chained extend() calls so PHPStan can narrow the type
+      // at each step. Each call returns the generic ExtendableInterface,
+      // so we assert the concrete extender type before using its methods.
+      $pager_query = $select->extend(PagerSelectExtender::class);
+      assert($pager_query instanceof PagerSelectExtender);
+      $query = $pager_query->extend(TableSortExtender::class);
+      assert($query instanceof TableSortExtender);
+      $pager_query->limit(50);
+      $query->orderByHeader($header);
 
       if ($filter !== '') {
         $query->condition('source', '%' . $this->database->escapeLike($filter) . '%', 'LIKE');
