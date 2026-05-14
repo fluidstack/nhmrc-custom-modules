@@ -25,5 +25,6 @@ services:
       - '@database'
       - '@logger.factory'
       - '@path_alias.manager'
+      - '@language_manager'
     tags:
       - { name: event_subscriber }

@@ -5,6 +5,7 @@ namespace Drupal\nhmrc_archive_redirect\EventSubscriber;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\path_alias\AliasManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -53,6 +54,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
     private readonly Connection $database,
     private readonly LoggerChannelFactoryInterface $loggerFactory,
     private readonly AliasManagerInterface $aliasManager,
+    private readonly LanguageManagerInterface $languageManager,
   ) {}
 
   /**
@@ -65,6 +67,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
       $container->get('database'),
       $container->get('logger.factory'),
       $container->get('path_alias.manager'),
+      $container->get('language_manager'),
     );
   }
 
@@ -125,12 +128,52 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
     $candidates = [$request_path];
 
     // Resolve the request path's internal system path; if it points to a node,
-    // include the node/{nid} form as a candidate.
-    $internal = $this->aliasManager->getPathByAlias('/' . $request_path);
+    // include the node/{nid} form as a candidate. Try each configured language
+    // because the alias may belong to a translation other than the current
+    // request's language (e.g. an editor opens a French alias on an English
+    // session). The default getPathByAlias() call only consults the current
+    // language and would miss the alias entirely.
+    $internal = '/' . $request_path;
+    foreach ($this->languageManager->getLanguages() as $langcode => $language) {
+      $resolved = $this->aliasManager->getPathByAlias('/' . $request_path, $langcode);
+      if ($resolved !== '/' . $request_path) {
+        $internal = $resolved;
+        break;
+      }
+    }
     if ($internal !== '/' . $request_path) {
       $internal_trim = ltrim($internal, '/');
       if ($internal_trim !== '' && !in_array($internal_trim, $candidates, TRUE)) {
         $candidates[] = $internal_trim;
+      }
+    }
+
+    // If the resolved internal path is a node canonical, also include the
+    // alias for every configured language. On multilingual sites the same
+    // node has one alias per translation and each may be the source of a
+    // stale contrib Redirect entity. Without this we would only clean up
+    // the alias for the current request's language.
+    if (preg_match('#^/node/(\d+)$#', $internal, $m) === 1) {
+      $node_path = '/node/' . $m[1];
+      // Per-language aliases.
+      foreach ($this->languageManager->getLanguages() as $langcode => $language) {
+        $lang_alias = $this->aliasManager->getAliasByPath($node_path, $langcode);
+        if ($lang_alias === $node_path) {
+          continue;
+        }
+        $lang_alias_trim = ltrim($lang_alias, '/');
+        if ($lang_alias_trim !== '' && !in_array($lang_alias_trim, $candidates, TRUE)) {
+          $candidates[] = $lang_alias_trim;
+        }
+      }
+      // Language-neutral safety net for language-neutral installs / aliases
+      // not tied to a specific language. Mirrors the module hook behaviour.
+      $neutral = $this->aliasManager->getAliasByPath($node_path);
+      if ($neutral !== $node_path) {
+        $neutral_trim = ltrim($neutral, '/');
+        if ($neutral_trim !== '' && !in_array($neutral_trim, $candidates, TRUE)) {
+          $candidates[] = $neutral_trim;
+        }
       }
     }
 

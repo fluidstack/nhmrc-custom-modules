@@ -49,23 +49,42 @@ function nhmrc_archive_redirect_entity_update(EntityInterface $entity): void {
   // Invalidate the node's cache tag (also done by core, but explicit for clarity).
   Cache::invalidateTags(['node:' . $entity->id()]);
 
-  // Invalidate stored-redirect cache tags for both the alias and raw node path.
-  $tags_to_invalidate = ['nhmrc_archive_redirect:source:node/' . $entity->id()];
+  // Collect aliases for every translation/language of the node so cleanup
+  // covers all language variants — not just the alias for the language the
+  // current request happens to be in. On multilingual sites the same node
+  // typically has one alias per translation, each potentially targeted by a
+  // stale contrib Redirect entity.
+  $node_path = '/node/' . $entity->id();
+  $alias_manager = \Drupal::service('path_alias.manager');
+  $aliases = [];
+  $translation_languages = $entity->getTranslationLanguages(TRUE);
+  foreach ($translation_languages as $langcode => $language) {
+    $candidate = $alias_manager->getAliasByPath($node_path, $langcode);
+    if ($candidate && $candidate !== $node_path && !in_array($candidate, $aliases, TRUE)) {
+      $aliases[] = $candidate;
+    }
+  }
+  // Also resolve the alias with no language constraint as a safety net for
+  // language-neutral installs / non-translatable nodes.
+  $neutral_alias = $alias_manager->getAliasByPath($node_path);
+  if ($neutral_alias && $neutral_alias !== $node_path && !in_array($neutral_alias, $aliases, TRUE)) {
+    $aliases[] = $neutral_alias;
+  }
 
-  $alias = \Drupal::service('path_alias.manager')
-    ->getAliasByPath('/node/' . $entity->id());
-  if ($alias && $alias !== '/node/' . $entity->id()) {
-    $source = ltrim($alias, '/');
-    $tags_to_invalidate[] = 'nhmrc_archive_redirect:source:' . $source;
+  // Invalidate stored-redirect cache tags for the raw node path and every
+  // collected alias.
+  $tags_to_invalidate = ['nhmrc_archive_redirect:source:node/' . $entity->id()];
+  foreach ($aliases as $a) {
+    $tags_to_invalidate[] = 'nhmrc_archive_redirect:source:' . ltrim($a, '/');
   }
 
   Cache::invalidateTags($tags_to_invalidate);
 
   $logger->debug(
-    'Invalidated cache tags: @tags. Alias resolved to: @alias.',
+    'Invalidated cache tags: @tags. Aliases resolved: @aliases.',
     [
-      '@tags'  => implode(', ', $tags_to_invalidate),
-      '@alias' => $alias ?: '(none)',
+      '@tags'    => implode(', ', $tags_to_invalidate),
+      '@aliases' => $aliases ? implode(', ', $aliases) : '(none)',
     ]
   );
 
@@ -73,8 +92,8 @@ function nhmrc_archive_redirect_entity_update(EntityInterface $entity): void {
   // DeletedPageRedirectSubscriber does not serve stale redirects.
   $database = \Drupal::database();
   $sources_to_delete = ['node/' . $entity->id()];
-  if ($alias && $alias !== '/node/' . $entity->id()) {
-    $sources_to_delete[] = ltrim($alias, '/');
+  foreach ($aliases as $a) {
+    $sources_to_delete[] = ltrim($a, '/');
   }
 
   try {
