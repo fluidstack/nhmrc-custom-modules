@@ -6,7 +6,6 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Drupal\Core\Path\PathValidatorInterface;
 use Drupal\path_alias\AliasManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -54,7 +53,6 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
     private readonly Connection $database,
     private readonly LoggerChannelFactoryInterface $loggerFactory,
     private readonly AliasManagerInterface $aliasManager,
-    private readonly PathValidatorInterface $pathValidator,
   ) {}
 
   /**
@@ -67,7 +65,6 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
       $container->get('database'),
       $container->get('logger.factory'),
       $container->get('path_alias.manager'),
-      $container->get('path.validator'),
     );
   }
 
