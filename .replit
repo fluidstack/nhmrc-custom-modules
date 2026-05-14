@@ -37,3 +37,7 @@ waitForPort = 5000
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "PHP_CLI_SERVER_WORKERS=4 php -S 0.0.0.0:5000 -t /home/runner/workspace/drupal/web /home/runner/workspace/drupal/web/router.php"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
