@@ -16,3 +16,16 @@ services:
     arguments: ['@database', '@config.factory', '@logger.factory', '@current_user']
     tags:
       - { name: event_subscriber }
+
+  nhmrc_archive_redirect.contrib_redirect_bypass_subscriber:
+    class: Drupal\nhmrc_archive_redirect\EventSubscriber\ContribRedirectBypassSubscriber
+    arguments:
+      - '@config.factory'
+      - '@module_handler'
+      - '@database'
+      - '@logger.factory'
+      - '@path_alias.manager'
+      - '@path.validator'
+      - '@current_user'
+    tags:
+      - { name: event_subscriber }

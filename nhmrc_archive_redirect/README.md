@@ -58,6 +58,42 @@ This means visitors see the live page immediately after re-publication, with no 
 - Only runs for `entity.node.canonical` requests (unpublished nodes) or stored-record lookups (deleted pages)
 - **No-store headers** prevent reverse proxies from caching stale redirects
 
+### Contrib Redirect interop (cleanup of stale entries)
+
+Older versions of this module — and other workflows (manual editor entries,
+content migrations) — sometimes leave behind contrib **Redirect** entities
+(`drupal/redirect`) whose source path matches a node this module is supposed
+to manage. Those entities are served by contrib Redirect's own kernel
+subscriber at priority 33, **before** any of this module's runtime logic
+runs, which means they ignore:
+
+- the *Allow editors to preview unpublished content* permission bypass,
+- node re-publication (a stale 301 keeps firing forever), and
+- the preview-token query parameter (e.g. `?auNHMRC=...`).
+
+You can identify a contrib-Redirect-served redirect from its response
+header: `x-redirect-id: <rid>` (this header is added by contrib Redirect and
+is never set by this module).
+
+When the **Clean up stale contrib Redirect entities** option is enabled
+(default ON, on the settings form) and the contrib Redirect module is
+installed, this module will:
+
+1. **On node re-publish** — delete contrib Redirect entities whose source
+   path matches the node's `node/{nid}` form or its current alias.
+2. **On preview-token bypass** — when an explicit token is present in the
+   query string (wildcard `*` mode is excluded), delete contrib Redirect
+   entities for the requested path so the request continues to the node
+   controller for the rest of this and all future visits.
+
+To stay safe, contrib Redirect entities are only deleted when their
+destination matches a path this module currently manages (a delete-path-rule
+destination, a content-type mapping, or the configured fallback path).
+Entities pointing at unrelated destinations (e.g. an editor's hand-curated
+SEO redirect to an external campaign page) are left untouched.
+
+Disable the toggle to leave all contrib Redirect entities alone.
+
 ---
 
 ## Requirements

@@ -95,6 +95,142 @@ function nhmrc_archive_redirect_entity_update(EntityInterface $entity): void {
   catch (\Exception $e) {
     // Table may not exist yet.
   }
+
+  // Soft-detect contrib Redirect: when enabled, also remove any contrib
+  // Redirect entities whose source path is one of this node's paths. These
+  // entities are independent of our `nhmrc_archive_redirect_records` table
+  // and would otherwise keep firing at priority 33 in the kernel and serve
+  // a stale 301/302 even after the node is re-published — bypassing all of
+  // this module's cache, permission, and token-bypass logic.
+  $config = \Drupal::config('nhmrc_archive_redirect.settings');
+  $cleanup_enabled = $config->get('cleanup_contrib_redirects');
+  // NULL (key absent from active config — typical of existing sites that have
+  // not yet saved the updated settings form) is treated as enabled so the fix
+  // applies without requiring a config save.
+  if ($cleanup_enabled === FALSE) {
+    return;
+  }
+  if (!\Drupal::moduleHandler()->moduleExists('redirect')) {
+    return;
+  }
+
+  try {
+    $rows = $database
+      ->select('redirect', 'r')
+      ->fields('r', ['rid', 'redirect_redirect__uri'])
+      ->condition('redirect_source__path', $sources_to_delete, 'IN')
+      ->execute()
+      ->fetchAll();
+  }
+  catch (\Exception $e) {
+    // Schema differs or table missing; nothing safe to do.
+    return;
+  }
+
+  if (empty($rows)) {
+    return;
+  }
+
+  // Apply the same destination-scoping guard as ContribRedirectBypassSubscriber:
+  // only remove entities whose destination matches a path this module currently
+  // manages. This prevents wiping out unrelated editor-curated redirects that
+  // happen to share a source path with this node.
+  $managed = _nhmrc_archive_redirect_managed_destination_set($config);
+  $rids = [];
+  foreach ($rows as $row) {
+    $dest = _nhmrc_archive_redirect_normalise_destination_uri((string) $row->redirect_redirect__uri);
+    if ($dest !== NULL && isset($managed[$dest])) {
+      $rids[] = (int) $row->rid;
+    }
+  }
+
+  if (empty($rids)) {
+    return;
+  }
+
+  try {
+    $storage = \Drupal::entityTypeManager()->getStorage('redirect');
+    $entities = $storage->loadMultiple($rids);
+    if (!empty($entities)) {
+      $storage->delete($entities);
+      $logger->notice(
+        'Removed @count stale contrib Redirect entit@y (rid: @rids) for re-published node @nid (source paths: @paths).',
+        [
+          '@count' => count($entities),
+          '@y'    => count($entities) === 1 ? 'y' : 'ies',
+          '@rids' => implode(',', array_keys($entities)),
+          '@nid'  => $entity->id(),
+          '@paths' => implode(', ', $sources_to_delete),
+        ]
+      );
+    }
+  }
+  catch (\Exception $e) {
+    $logger->warning(
+      'Could not delete stale contrib Redirect entities for re-published node @nid: @msg.',
+      ['@nid' => $entity->id(), '@msg' => $e->getMessage()]
+    );
+  }
+}
+
+/**
+ * Builds a set of internal paths this module currently manages.
+ *
+ * Shared by hook_entity_update() and ContribRedirectBypassSubscriber so the
+ * "is this our redirect to safely delete?" decision uses identical rules.
+ *
+ * Keys are normalised internal paths (with leading slash, `<front>` → `/`).
+ */
+function _nhmrc_archive_redirect_managed_destination_set($config): array {
+  $set = [];
+  foreach (($config->get('delete_path_rules') ?? []) as $rule) {
+    $dest = _nhmrc_archive_redirect_normalise_internal_path((string) ($rule['destination'] ?? ''));
+    if ($dest !== NULL) {
+      $set[$dest] = TRUE;
+    }
+  }
+  foreach (($config->get('content_type_paths') ?? []) as $dest) {
+    $dest = _nhmrc_archive_redirect_normalise_internal_path((string) $dest);
+    if ($dest !== NULL) {
+      $set[$dest] = TRUE;
+    }
+  }
+  $fallback = _nhmrc_archive_redirect_normalise_internal_path((string) ($config->get('fallback_path') ?? ''));
+  if ($fallback !== NULL) {
+    $set[$fallback] = TRUE;
+  }
+  return $set;
+}
+
+/**
+ * Normalises a stored destination value to a comparable internal path.
+ */
+function _nhmrc_archive_redirect_normalise_internal_path(string $value): ?string {
+  $value = trim($value);
+  if ($value === '') {
+    return NULL;
+  }
+  if ($value === '<front>') {
+    return '/';
+  }
+  if (!str_starts_with($value, '/')) {
+    $value = '/' . $value;
+  }
+  return $value;
+}
+
+/**
+ * Normalises a contrib Redirect destination URI to a comparable internal path.
+ *
+ * Returns NULL for non-internal targets (route:, entity:, http(s):) — those
+ * are intentionally left out of scope for the cleanup logic.
+ */
+function _nhmrc_archive_redirect_normalise_destination_uri(string $uri): ?string {
+  $uri = trim($uri);
+  if (str_starts_with($uri, 'internal:')) {
+    return _nhmrc_archive_redirect_normalise_internal_path(substr($uri, strlen('internal:')));
+  }
+  return NULL;
 }
 
 /**
