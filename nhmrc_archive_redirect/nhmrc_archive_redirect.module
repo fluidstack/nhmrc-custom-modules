@@ -103,7 +103,7 @@ function nhmrc_archive_redirect_entity_update(EntityInterface $entity): void {
   // a stale 301/302 even after the node is re-published — bypassing all of
   // this module's cache, permission, and token-bypass logic.
   $config = \Drupal::config('nhmrc_archive_redirect.settings');
-  $cleanup_enabled = $config->get('cleanup_contrib_redirects');
+  $cleanup_enabled = $config->get('cleanup_contrib_redirects_on_republish');
   // NULL (key absent from active config — typical of existing sites that have
   // not yet saved the updated settings form) is treated as enabled so the fix
   // applies without requiring a config save.

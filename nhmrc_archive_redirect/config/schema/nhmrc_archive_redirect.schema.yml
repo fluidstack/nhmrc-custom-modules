@@ -31,9 +31,9 @@ nhmrc_archive_redirect.settings:
     preview_token_param:
       type: string
       label: 'Preview token query parameter name'
-    cleanup_contrib_redirects:
+    cleanup_contrib_redirects_on_republish:
       type: boolean
-      label: 'Clean up stale contrib Redirect entities for re-published or token-previewed node paths'
+      label: 'Clean up stale contrib Redirect entities (on re-publish and on preview-token bypass)'
     delete_path_rules:
       type: sequence
       label: 'Delete path rules'

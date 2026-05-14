@@ -6,4 +6,4 @@ log_redirects: false
 bypass_for_editors: true
 delete_path_rules: [  ]
 preview_token_param: 'auNHMRC'
-cleanup_contrib_redirects: true
+cleanup_contrib_redirects_on_republish: true

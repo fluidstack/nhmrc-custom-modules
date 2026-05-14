@@ -75,9 +75,9 @@ You can identify a contrib-Redirect-served redirect from its response
 header: `x-redirect-id: <rid>` (this header is added by contrib Redirect and
 is never set by this module).
 
-When the **Clean up stale contrib Redirect entities** option is enabled
-(default ON, on the settings form) and the contrib Redirect module is
-installed, this module will:
+When the **Clean up stale contrib Redirect entities** option
+(`cleanup_contrib_redirects_on_republish`, default ON) is enabled and the
+contrib Redirect module is installed, this module will:
 
 1. **On node re-publish** — delete contrib Redirect entities whose source
    path matches the node's `node/{nid}` form or its current alias.

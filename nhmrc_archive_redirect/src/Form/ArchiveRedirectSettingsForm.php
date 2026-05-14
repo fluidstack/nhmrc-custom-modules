@@ -145,11 +145,11 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       '#description' => $this->t('The URL query parameter that grants anonymous users access to unpublished content. For example, with the default value <code>auNHMRC</code>, a URL like <code>?auNHMRC=sometoken</code> will bypass the redirect. Use <code>*</code> to bypass the redirect for <strong>all</strong> requests regardless of query parameters (useful during testing or migration). Leave blank to disable the token bypass entirely.'),
     ];
 
-    $form['behaviour']['cleanup_contrib_redirects'] = [
+    $form['behaviour']['cleanup_contrib_redirects_on_republish'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Clean up stale contrib Redirect entities'),
-      '#description' => $this->t('When enabled and the contrib <em>Redirect</em> module is installed, this module will delete contrib Redirect entities whose source path matches a re-published node, and also when the preview-token parameter (above) is used to bypass a redirect. Only entities whose destination matches a path managed by this module (delete path rules, content-type mappings, or the fallback path) are removed. Disable to leave all contrib Redirect entities untouched.'),
-      '#default_value' => $config->get('cleanup_contrib_redirects') !== FALSE,
+      '#title' => $this->t('Clean up stale contrib Redirect entities on re-publish (and on preview-token bypass)'),
+      '#description' => $this->t('When enabled and the contrib <em>Redirect</em> module is installed, this module will delete contrib Redirect entities whose source path matches a re-published node, and also when the preview-token parameter (above) is used on a request that contrib Redirect would otherwise intercept. Only entities whose destination matches a path managed by this module (delete path rules, content-type mappings, or the fallback path) are removed. Disable to leave all contrib Redirect entities untouched.'),
+      '#default_value' => $config->get('cleanup_contrib_redirects_on_republish') !== FALSE,
     ];
 
     // ----------------------------------------------------------------
@@ -604,7 +604,7 @@ final class ArchiveRedirectSettingsForm extends ConfigFormBase {
       ->set('log_redirects', (bool) $form_state->getValue(['behaviour', 'log_redirects']))
       ->set('bypass_for_editors', (bool) $form_state->getValue(['behaviour', 'bypass_for_editors']))
       ->set('preview_token_param', trim((string) $form_state->getValue(['behaviour', 'preview_token_param'])))
-      ->set('cleanup_contrib_redirects', (bool) $form_state->getValue(['behaviour', 'cleanup_contrib_redirects']))
+      ->set('cleanup_contrib_redirects_on_republish', (bool) $form_state->getValue(['behaviour', 'cleanup_contrib_redirects_on_republish']))
       ->set('delete_path_rules', $delete_path_rules)
       ->save();
 

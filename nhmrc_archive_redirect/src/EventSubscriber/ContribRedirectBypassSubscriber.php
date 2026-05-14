@@ -7,7 +7,6 @@ use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Path\PathValidatorInterface;
-use Drupal\Core\Session\AccountInterface;
 use Drupal\path_alias\AliasManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -56,7 +55,6 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
     private readonly LoggerChannelFactoryInterface $loggerFactory,
     private readonly AliasManagerInterface $aliasManager,
     private readonly PathValidatorInterface $pathValidator,
-    private readonly AccountInterface $currentUser,
   ) {}
 
   /**
@@ -70,7 +68,6 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
       $container->get('logger.factory'),
       $container->get('path_alias.manager'),
       $container->get('path.validator'),
-      $container->get('current_user'),
     );
   }
 
@@ -96,7 +93,7 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
     }
 
     $config = $this->configFactory->get('nhmrc_archive_redirect.settings');
-    if ($config->get('cleanup_contrib_redirects') === FALSE) {
+    if ($config->get('cleanup_contrib_redirects_on_republish') === FALSE) {
       return;
     }
 
@@ -105,20 +102,20 @@ final class ContribRedirectBypassSubscriber implements EventSubscriberInterface 
       return;
     }
 
-    // Hardening: deletion is a state-changing side effect triggered by a GET
-    // query parameter. Restrict it to users who already hold a permission
-    // that lets them legitimately preview unpublished content. Anonymous
-    // visitors with the token still bypass the redirect logically (contrib
-    // Redirect will still serve its response on this request) but cannot
-    // cause persistent deletion of redirect entities. Editors and
-    // administrators — the people who would actually use the token to debug
-    // a stale redirect — retain full cleanup capability.
-    if (!$this->currentUser->hasPermission('bypass node access')
-      && !$this->currentUser->hasPermission('view own unpublished content')
-      && !$this->currentUser->hasPermission('administer redirects')
-    ) {
-      return;
-    }
+    // Note on threat model for this destructive side-effect on a GET:
+    //   - Triggered only when the configured preview-token query parameter is
+    //     explicitly present (wildcard `*` mode is excluded). The token value
+    //     itself is admin-configured and acts as a shared secret.
+    //   - Deletion is further constrained below to entities whose destination
+    //     matches a path THIS module currently manages — so an attacker who
+    //     learns the token can only remove redirect entries that this module
+    //     would have created. Editor-curated redirects to other destinations
+    //     are never touched.
+    //   - The whole behaviour can be disabled via the
+    //     `cleanup_contrib_redirects_on_republish` setting.
+    // Earlier iterations gated this on `bypass node access` etc., but that
+    // also blocked the legitimate anonymous preview-link use case for which
+    // the token exists in the first place.
 
     // Build the candidate source-path list (no leading slash, as stored by
     // contrib Redirect): the raw request path and, if it resolves to a node,
